@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sea-Eyes Control Room</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+    body.no-scroll {
+      overflow: hidden;
+      pointer-events: none;
+    }
+    body.no-scroll .login-container {
+      pointer-events: all;
+    }
+    .login-container {
+      width: 100%; height: 100vh;
+      display: flex; justify-content: center; align-items: center;
+      background: rgba(0, 0, 0, 0.6);
+      position: fixed; top: 0; left: 0; z-index: 2000;
+    }
+    .login-box {
+      background: #fff;
+      padding: 30px 40px;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+      text-align: center;
+    }
+    .login-box img { width: 100px; margin-bottom: 15px; }
+    .welcome-title { margin: 0; font-size: 24px; color: #007bff; }
+    .subheading { margin: 10px 0 20px; font-size: 18px; color: #444; }
+    .login-input {
+      width: 100%; padding: 10px; margin: 8px 0;
+      border: 1px solid #ccc; border-radius: 6px; font-size: 16px;
+    }
+    .login-btn {
+      padding: 10px 20px;
+      background-color: #007bff; color: white;
+      border: none; border-radius: 6px;
+      cursor: pointer; font-size: 16px;
+    }
+    .login-btn:hover { background-color: #0056b3; }
+    #map {
+      height: 500px; margin: 20px auto; width: 80%;
+      border-radius: 10px;
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+    }
+    #searchInput, #searchBtn {
+      padding: 6px 10px; border-radius: 5px;
+    }
+    #searchInput { border: 1px solid #ccc; }
+    #searchBtn {
+      background-color: #007bff;
+      color: white; border: none; cursor: pointer;
+    }
+    .vessel-list {
+      position: absolute;
+      top: 70px; right: 30px;
+      background: white; padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      max-height: 200px; overflow-y: auto;
+      text-align: left;
+    }
+    #sirenToggle {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background-color: #d9534f;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 3000;
+    }
+    #sirenToggle.muted {
+      background-color: #5bc0de;
+    }
+  </style>
+</head>
+<body class="no-scroll">
+  <div class="login-container" id="loginContainer">
+    <div class="login-box">
+      <img src="./assets/logo of Sea-Eyes.png" alt="Sea-Eyes Logo" />
+      <h2 class="welcome-title">Welcome to Sea-Eyes</h2>
+      <p class="subheading">Remote Access Control Room</p>
+      <input type="text" id="username" placeholder="Username" class="login-input" required /><br />
+      <input type="password" id="password" placeholder="Password" class="login-input" required /><br />
+      <button onclick="checkLogin()" class="login-btn">Login</button>
+    </div>
+  </div>
+
+
+    <script>
+    function checkLogin() {
+      const user = document.getElementById("username").value;
+      const pass = document.getElementById("password").value;
+      if (user === "mma" && pass === "1234") {
+        document.getElementById("loginContainer").style.display = "none";
+        document.body.classList.remove("no-scroll");
+      } else {
+        alert("Invalid Username or Password");
+      }
+    }
+  </script>
+
+  <div style="position: absolute; top: 20px; right: 30px; z-index: 1000;">
+    <input type="text" id="searchInput" placeholder="Search Vessel..." />
+    <button id="searchBtn" onclick="searchVessel()">Search</button>
+  </div>
+
+  <div class="vessel-list">
+    <strong style="display: block; font-size: 18px;">Vessels</strong>
+    <span style="display: block; color: green; font-weight: bold;">Connected:</span>
+    <div id="vesselList"></div>
+    <div id="dynamicVesselItem" style="padding: 4px 0; cursor: pointer; color: black;"></div>
+  </div>
+
+  <!-- <button onclick="document.getElementById('sirenAudio').play()">Test Siren</button> -->
+
+  <h1>
+    Sea-Eyes Control Room
+    <img src="./assets/logo of Sea-Eyes.png" alt="Project Logo" style="position: absolute; top: 20px; left: 30px; width: 80px; z-index: 1000" />
+  </h1>
+  <div id="map"></div>
+  <button id="sirenToggle">🔊 Siren On</button>
+  <audio id="sirenAudio" src="./assets/siren.mp3" preload="auto"></audio>
+
+  <!-- Your full JavaScript remains unchanged except where the siren is integrated in updateDynamicVessel() -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script>
+  
+  const firebaseConfig = {
+    apiKey: "AIzaSyAZh_LsyvD9Nn8vMvokZaSXoVJSayS4LxU",
+    authDomain: "sea-eyes.firebaseapp.com",
+    databaseURL: "https://sea-eyes-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "sea-eyes",
+    storageBucket: "sea-eyes.firebasestorage.app",
+    messagingSenderId: "98180700373",
+    appId: "1:98180700373:web:40580858081e2cdf946a5c",
+    measurementId: "G-1XW5MRE69T"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+
+  const sirenAudio = document.getElementById("sirenAudio");
+  window.addEventListener("click", () => {
+  sirenAudio.play().then(() => {
+    sirenAudio.pause();
+    sirenAudio.currentTime = 0;
+  }).catch(() => {});
+}, { once: true });
+
+  const sirenToggle = document.getElementById("sirenToggle");
+  let isSirenMuted = false;
+
+  sirenToggle.addEventListener("click", () => {
+    isSirenMuted = !isSirenMuted;
+    sirenToggle.textContent = isSirenMuted ? "🔇 Siren Off" : "🔊 Siren On";
+    sirenToggle.classList.toggle("muted", isSirenMuted);
+    if (isSirenMuted) {
+      sirenAudio.pause();
+      sirenAudio.currentTime = 0;
+    }
+  });
+
+  let hasUserInteracted = false;
+
+window.addEventListener("click", () => {
+  hasUserInteracted = true;
+});
+
+function playSirenIfDanger(danger) {
+  if (danger && !isSirenMuted && hasUserInteracted) {
+    sirenAudio.play().catch(e => console.log("Playback blocked:", e));
+  } else {
+    sirenAudio.pause();
+    sirenAudio.currentTime = 0;
+  }
+  console.log("playSirenIfDanger called. Danger:", danger, "Muted:", isSirenMuted, "User interacted:", hasUserInteracted);
+
+}
+
+
+  const map = L.map("map").setView([27.13, 31.31], 8);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+
+  const boatIcon = L.icon({
+    iconUrl: "./assets/webboat.png",
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -20]
+  });
+  const boatIconDynamic = boatIcon;
+
+  const vessels = [
+    { lat: 27.1317726, lng: 31.3136097, vesselName: "Eagle One", source: "Waraa Giza", destination: "Port of Aswan", shipmentType: "120 People", sensors: "No Harm Readings", camera: "Nothing nearby" },
+    { lat: 27.1277447, lng: 31.3139708, vesselName: "Falcon Two", source: "Alex Port", destination: "New Valley", shipmentType: "Cargo - Electronics", sensors: "Stable", camera: "No movement" },
+    { lat: 27.1252656, lng: 31.3147728, vesselName: "Hawk Three", source: "Red Sea Port", destination: "Upper Egypt", shipmentType: "Fuel", sensors: "Temperature Normal", camera: "Clear" }
+  ];
+
+  let markers = [];
+  const dynamicNameDiv = document.getElementById("dynamicVesselItem");
+  let dynamicMarker = null;
+
+  function createPopupContent(v, i) {
+    return `<h3>${v.vesselName}</h3><p><strong>Source:</strong> ${v.source}</p><p><strong>Destination:</strong> ${v.destination}</p><p><strong>Shipment:</strong> ${v.shipmentType}</p><p><strong>Sensors:</strong> ${v.sensors}</p><p><strong>Camera:</strong> ${v.camera}</p><button onclick="editVessel(${i})">Edit</button>`;
+  }
+
+  function renderVessels() {
+    markers.forEach((m) => map.removeLayer(m));
+    markers = [];
+    vessels.forEach((v, i) => {
+      const marker = L.marker([v.lat, v.lng], { icon: boatIcon }).addTo(map);
+      marker.bindPopup(createPopupContent(v, i));
+      markers.push(marker);
+    });
+    updateVesselList();
+  }
+
+  function updateVesselList() {
+    const listContainer = document.getElementById("vesselList");
+    listContainer.innerHTML = "";
+    vessels.forEach((v, i) => {
+      const item = document.createElement("div");
+      item.style.cursor = "pointer";
+      item.style.padding = "4px 0";
+      item.textContent = v.vesselName;
+      item.onclick = () => {
+        map.setView([v.lat, v.lng], 14);
+        markers[i].openPopup();
+      };
+      listContainer.appendChild(item);
+    });
+  }
+
+  function editVessel(i) {
+    const v = vessels[i];
+    v.vesselName = prompt("Vessel Name:", v.vesselName) || v.vesselName;
+    v.source = prompt("Source:", v.source) || v.source;
+    v.destination = prompt("Destination:", v.destination) || v.destination;
+    v.shipmentType = prompt("Shipment Type:", v.shipmentType) || v.shipmentType;
+    v.sensors = prompt("Sensors:", v.sensors) || v.sensors;
+    v.camera = prompt("Camera:", v.camera) || v.camera;
+    renderVessels();
+  }
+
+  function searchVessel() {
+    const query = document.getElementById("searchInput").value.trim().toLowerCase();
+    const i = vessels.findIndex((v) => v.vesselName.toLowerCase() === query);
+    if (i !== -1) {
+      map.setView([vessels[i].lat, vessels[i].lng], 14);
+      markers[i].openPopup();
+    } else if (dynamicNameDiv.textContent.toLowerCase() === query) {
+      focusDynamicVessel();
+    } else {
+      alert("Vessel not found!");
+    }
+  }
+
+  function updateDynamicVessel(lat, lng, staticData, ultraData) {
+    const tl = parseFloat(ultraData["Top left"]);
+    const tr = parseFloat(ultraData["Top right"]);
+    const bl = parseFloat(ultraData["Bottom left"]);
+    const br = parseFloat(ultraData["Bottom right"]);
+    const values = [tl, tr, bl, br];
+    const danger = values.some(v => v < 10);
+    const status = danger ? "<span style='color:red'>Ultrasonic sensor: Danger is detected!</span>" : "<span style='color:green'>Ultrasonic sensor: Safe readings</span>";
+    const now = new Date();
+    const formattedTime = now.toLocaleString();
+
+    setTimeout(() => {
+  playSirenIfDanger(danger);
+}, 300); // small delay allows interaction flag to set
+
+
+    const popup = `
+      <h3>${staticData.vessel_name || "Dynamic Vessel"}</h3>
+      <p><strong>Source:</strong> ${staticData.source}</p>
+      <p><strong>Destination:</strong> ${staticData.destination}</p>
+      <p><strong>Shipment:</strong> ${staticData.shipment_type}</p>
+      <p><strong>Sensors:</strong> Realtime Data</p>
+      <p><strong>Camera:</strong> N/A</p>
+      <p><strong>Top Left:</strong> ${tl}</p>
+      <p><strong>Top Right:</strong> ${tr}</p>
+      <p><strong>Bottom Left:</strong> ${bl}</p>
+      <p><strong>Bottom Right:</strong> ${br}</p>
+      <p>${status}</p>
+      <p><strong>Last Update:</strong> ${formattedTime}</p>`;
+
+    if (dynamicMarker) {
+      dynamicMarker.setLatLng([lat, lng]).bindPopup(popup);
+    } else {
+      dynamicMarker = L.marker([lat, lng], { icon: boatIconDynamic }).addTo(map).bindPopup(popup);
+    }
+
+    const label = staticData.vessel_name || "Dynamic Vessel";
+    const dangerLabel = danger ? "🟥 " + label : label;
+    dynamicNameDiv.textContent = dangerLabel;
+    dynamicNameDiv.onclick = focusDynamicVessel;
+  }
+
+  function listenForRealtimeUpdates() {
+    let currentLocation = null;
+    let currentUltrasonic = null;
+    let currentStatic = null;
+
+    function tryUpdate() {
+      if (currentLocation && currentUltrasonic && currentStatic) {
+        updateDynamicVessel(currentLocation.latitude, currentLocation.longitude, currentStatic, currentUltrasonic);
+      }
+    }
+
+    const dynamicRef = database.ref("ultra_sonic/3-set");
+    const ultrasonicRef = database.ref("ultra_sonic/1-set");
+    const staticRef = database.ref("static_data");
+
+    dynamicRef.on("value", (snap) => {
+      currentLocation = snap.val();
+      tryUpdate();
+    });
+
+    ultrasonicRef.on("value", (snap) => {
+      currentUltrasonic = snap.val();
+      tryUpdate();
+    });
+
+    staticRef.on("value", (snap) => {
+      currentStatic = snap.val();
+      tryUpdate();
+    });
+  }
+
+  function focusDynamicVessel() {
+    if (dynamicMarker) {
+      map.setView(dynamicMarker.getLatLng(), 14);
+      dynamicMarker.openPopup();
+    }
+  }
+
+  renderVessels();
+  listenForRealtimeUpdates();
+</script>
+</body>
+</html>
