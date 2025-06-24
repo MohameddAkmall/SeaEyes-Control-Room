@@ -30,7 +30,7 @@ Built for port authorities, coast guard teams, and maritime supervisors, the Con
 
 - **Frontend:** React.js / HTML / JavaScript
 - **Backend:** Firebase Realtime Database
-- **Map:** Leaflet.js / Google Maps API
+- **Map:** Leaflet.js 
 - **Auth (Optional):** Firebase Auth
 
 ## 🗂️ Firebase Data Structure (Sample)
@@ -63,7 +63,7 @@ Clone the repository:
 bash
 Copy
 Edit
-git clone https://github.com/yourusername/sea-eyes-control-room.git
+git clone https://github.com/MohamedAkmall/sea-eyes-control-room.git
 cd sea-eyes-control-room
 Install dependencies:
 
@@ -103,5 +103,5 @@ Fleet Map	Radar Display	Sensor Table
  Boat command/control API
 
 🧑‍💻 Author
-Mohamed Fath Elbab
-Behance
+Mohamed Akmal Samy
+Electronics and Communication engineer
